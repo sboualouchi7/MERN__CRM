@@ -144,14 +144,18 @@ exports.getLeads = async (req, res) => {
       query.status = status;
     }
     
+    console.log('Fetching leads with query:', query);
+    
+    // Assurez-vous que la population fonctionne
     const leads = await Lead.find(query).populate('managerId', 'name email');
+    console.log(`Found ${leads.length} leads`);
+    
     res.json(leads);
   } catch (error) {
-    console.error(error);
+    console.error('Error fetching leads:', error);
     res.status(500).json({ message: 'Server Error' });
   }
 };
-
 //     Créer un lead
 // @route   POST /api/employer/leads
 
@@ -187,59 +191,57 @@ exports.createLead = async (req, res) => {
 
 exports.updateLead = async (req, res) => {
   try {
-    const lead = await Lead.findById(req.params.leadId);
-
-    if (!lead) {
+    const leadId = req.params.leadId;
+    const updateData = req.body;
+    
+    console.log(`Received update request for lead ${leadId}:`, updateData);
+    
+ 
+    const existingLead = await Lead.findById(leadId);
+    if (!existingLead) {
       return res.status(404).json({ message: 'Lead not found' });
     }
-
-    const { contactName, contactEmail, companyName, status, managerId, notes } = req.body;
-
-    if (managerId) {
-      // Vérifier si le nouveau manager existe
-      const manager = await User.findById(managerId);
-      
+    
+  
+    if (updateData.managerId) {
+      console.log(`Verifying manager ID: ${updateData.managerId}`);
+      const manager = await User.findById(updateData.managerId);
       if (!manager || manager.role !== 'manager') {
         return res.status(400).json({ message: 'Invalid manager ID' });
       }
-      
-      lead.managerId = managerId;
     }
-
-    lead.contactName = contactName || lead.contactName;
-    lead.contactEmail = contactEmail || lead.contactEmail;
-    lead.companyName = companyName || lead.companyName;
-    lead.status = status || lead.status;
     
-    if (notes) {
-      lead.notes = notes;
-    }
-
-    const updatedLead = await lead.save();
-
+    const updatedLead = await Lead.findByIdAndUpdate(
+      leadId,
+      updateData,
+      { new: true, runValidators: true }
+    ).populate('managerId', 'name email');
+    
+    console.log('Updated lead:', updatedLead);
     res.json(updatedLead);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server Error' });
+    console.error('Error updating lead:', error);
+    res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
-
 //    supp un lead
 // @route   DELETE /api/employer/leads/:leadId
 
 exports.deleteLead = async (req, res) => {
   try {
-    const lead = await Lead.findById(req.params.leadId);
-
+    const leadId = req.params.leadId;
+    
+    const lead = await Lead.findById(leadId);
     if (!lead) {
       return res.status(404).json({ message: 'Lead not found' });
     }
 
-    await lead.remove();
+    
+    await Lead.deleteOne({ _id: leadId });
 
     res.json({ message: 'Lead removed' });
   } catch (error) {
-    console.error(error);
+    console.error('Error deleting lead:', error);
     res.status(500).json({ message: 'Server Error' });
   }
 };
